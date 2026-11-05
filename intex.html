@@ -1,0 +1,466 @@
+
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bobur Website</title>
+<style>
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 20px;
+  text-align: center;
+  font-family: Arial, sans-serif;
+  background: #eef2ff;
+}
+
+header {
+  background: #1e3a8a;
+  color: white;
+  padding: 22px;
+  border-radius: 15px;
+}
+
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 9px;
+  margin: 20px auto;
+}
+
+button {
+  padding: 12px 16px;
+  border: none;
+  border-radius: 9px;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+button.active { background: #16a34a; }
+
+label {
+  background: white;
+  padding: 10px;
+  border-radius: 9px;
+}
+
+#board {
+  position: relative;
+  width: 100%;
+  max-width: 1000px;
+  height: 550px;
+  margin: auto;
+  background: white;
+  border: 2px solid #cbd5e1;
+  border-radius: 12px;
+  overflow: hidden;
+  touch-action: none;
+}
+
+canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+#imageBox {
+  position: absolute;
+  display: none;
+  left: 30px;
+  top: 30px;
+  width: 200px;
+  height: 150px;
+  cursor: move;
+  border: 1px dashed #2563eb;
+  touch-action: none;
+}
+
+#imageBox img {
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+  user-select: none;
+}
+
+#resizeHandle {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  right: -8px;
+  bottom: -8px;
+  background: #2563eb;
+  border: 2px solid white;
+  border-radius: 50%;
+  cursor: nwse-resize;
+}
+
+footer {
+  margin: 20px;
+  color: #64748b;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>🎨 Bobur Website</h1>
+  <p>O‘z ijodingizni yarating!</p>
+</header>
+
+<div class="tools">
+  <button id="pen" class="active">✏️ Qalam</button>
+  <button id="eraser">🧽 O‘chirg‘ich</button>
+  <button id="clear">🗑️ Tozalash</button>
+  <button id="uploadBtn">🖼️ Rasm joylash</button>
+  <button id="zoomIn">➕ Kattalashtirish</button>
+  <button id="zoomOut">➖ Kichraytirish</button>
+  <button id="resetImage">🔄 Qaytarish</button>
+  <button id="download">⬇️ Saqlash</button>
+
+  <input type="file" id="imageUpload" accept="image/*" hidden>
+
+  <label>Rang:
+    <input type="color" id="color" value="#000000">
+  </label>
+
+  <label>Qalinlik:
+    <input type="range" id="size" min="1" max="40" value="5">
+  </label>
+</div>
+
+<div id="board">
+  <canvas id="canvas"></canvas>
+
+  <div id="imageBox">
+    <img id="placedImage" alt="Tanlangan rasm">
+    <div id="resizeHandle"></div>
+  </div>
+</div>
+
+<footer>© 2026 Bobur Website</footer>
+
+<script>
+const board = document.getElementById("board");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+const imageBox = document.getElementById("imageBox");
+const placedImage = document.getElementById("placedImage");
+const resizeHandle = document.getElementById("resizeHandle");
+const imageUpload = document.getElementById("imageUpload");
+
+let tool = "pen";
+let drawing = false;
+let color = "#000000";
+let size = 5;
+
+let imageState = null;
+let action = null;
+let startX = 0;
+let startY = 0;
+let original = null;
+
+const width = board.clientWidth;
+const height = board.clientHeight;
+const dpr = window.devicePixelRatio || 1;
+
+canvas.width = width * dpr;
+canvas.height = height * dpr;
+ctx.scale(dpr, dpr);
+
+function getPosition(e) {
+  const rect = board.getBoundingClientRect();
+  return {
+    x: e.clientX - rect.left,
+    y: e.clientY - rect.top
+  };
+}
+
+// QALAM VA O'CHIRG'ICH
+
+canvas.addEventListener("pointerdown", e => {
+  if (tool !== "pen" && tool !== "eraser") return;
+
+  drawing = true;
+  canvas.setPointerCapture(e.pointerId);
+
+  const p = getPosition(e);
+
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = tool === "eraser" ? "white" : color;
+  ctx.lineWidth = size;
+});
+
+canvas.addEventListener("pointermove", e => {
+  if (!drawing) return;
+
+  const p = getPosition(e);
+
+  ctx.lineTo(p.x, p.y);
+  ctx.stroke();
+});
+
+function stopDrawing() {
+  drawing = false;
+  ctx.beginPath();
+}
+
+canvas.addEventListener("pointerup", stopDrawing);
+canvas.addEventListener("pointercancel", stopDrawing);
+
+// ASBOBLAR
+
+document.getElementById("pen").onclick = () => {
+  tool = "pen";
+  document.getElementById("pen").classList.add("active");
+  document.getElementById("eraser").classList.remove("active");
+};
+
+document.getElementById("eraser").onclick = () => {
+  tool = "eraser";
+  document.getElementById("eraser").classList.add("active");
+  document.getElementById("pen").classList.remove("active");
+};
+
+document.getElementById("color").oninput = e => {
+  color = e.target.value;
+};
+
+document.getElementById("size").oninput = e => {
+  size = Number(e.target.value);
+};
+
+// RASM JOYLASH
+
+document.getElementById("uploadBtn").onclick = () => {
+  imageUpload.click();
+};
+
+imageUpload.onchange = e => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) {
+    alert("Faqat rasm tanlang!");
+    imageUpload.value = "";
+    return;
+  }
+
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+
+  img.onload = () => {
+    const maxW = board.clientWidth * 0.7;
+    const maxH = board.clientHeight * 0.7;
+    const scale = Math.min(maxW / img.width, maxH / img.height, 1);
+
+    imageState = {
+      x: (board.clientWidth - img.width * scale) / 2,
+      y: (board.clientHeight - img.height * scale) / 2,
+      w: img.width * scale,
+      h: img.height * scale,
+      startX: 0,
+      startY: 0
+    };
+
+    placedImage.src = url;
+    imageBox.style.display = "block";
+    updateImage();
+    imageUpload.value = "";
+  };
+
+  img.onerror = () => {
+    alert("Rasm ochilmadi!");
+    URL.revokeObjectURL(url);
+    imageUpload.value = "";
+  };
+
+  img.src = url;
+};
+
+function updateImage() {
+  if (!imageState) return;
+
+  imageBox.style.left = imageState.x + "px";
+  imageBox.style.top = imageState.y + "px";
+  imageBox.style.width = imageState.w + "px";
+  imageBox.style.height = imageState.h + "px";
+}
+
+// RASMNI SURISH VA KATTALASHTIRISH
+
+imageBox.addEventListener("pointerdown", e => {
+  if (!imageState) return;
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  imageBox.setPointerCapture(e.pointerId);
+
+  const p = getPosition(e);
+  startX = p.x;
+  startY = p.y;
+
+  original = { ...imageState };
+
+  action = e.target === resizeHandle ? "resize" : "move";
+});
+
+imageBox.addEventListener("pointermove", e => {
+  if (!action || !imageState) return;
+
+  const p = getPosition(e);
+  const dx = p.x - startX;
+  const dy = p.y - startY;
+
+  if (action === "move") {
+    imageState.x = Math.max(
+      0,
+      Math.min(board.clientWidth - imageState.w, original.x + dx)
+    );
+
+    imageState.y = Math.max(
+      0,
+      Math.min(board.clientHeight - imageState.h, original.y + dy)
+    );
+  }
+
+  if (action === "resize") {
+    const scale = Math.max(
+      0.15,
+      (original.w + dx) / original.w
+    );
+
+    const ratio = original.h / original.w;
+
+    imageState.w = Math.min(
+      board.clientWidth,
+      Math.max(30, original.w * scale)
+    );
+
+    imageState.h = Math.max(30, imageState.w * ratio);
+
+    imageState.x = Math.min(
+      original.x,
+      board.clientWidth - imageState.w
+    );
+
+    imageState.y = Math.min(
+      original.y,
+      board.clientHeight - imageState.h
+    );
+  }
+
+  updateImage();
+});
+
+function stopAction() {
+  action = null;
+}
+
+imageBox.addEventListener("pointerup", stopAction);
+imageBox.addEventListener("pointercancel", stopAction);
+
+// KATTALASHTIRISH
+
+function zoom(factor) {
+  if (!imageState) {
+    alert("Avval rasm joylang!");
+    return;
+  }
+
+  const centerX = imageState.x + imageState.w / 2;
+  const centerY = imageState.y + imageState.h / 2;
+
+  const newW = Math.min(
+    board.clientWidth,
+    Math.max(30, imageState.w * factor)
+  );
+
+  const newH = imageState.h * (newW / imageState.w);
+
+  imageState.w = newW;
+  imageState.h = newH;
+  imageState.x = Math.max(0, Math.min(board.clientWidth - newW, centerX - newW / 2));
+  imageState.y = Math.max(0, Math.min(board.clientHeight - newH, centerY - newH / 2));
+
+  updateImage();
+}
+
+document.getElementById("zoomIn").onclick = () => zoom(1.2);
+document.getElementById("zoomOut").onclick = () => zoom(0.8);
+
+document.getElementById("resetImage").onclick = () => {
+  if (!imageState) return;
+
+  const w = placedImage.naturalWidth;
+  const h = placedImage.naturalHeight;
+  const scale = Math.min(
+    board.clientWidth * 0.7 / w,
+    board.clientHeight * 0.7 / h,
+    1
+  );
+
+  imageState.w = w * scale;
+  imageState.h = h * scale;
+  imageState.x = (board.clientWidth - imageState.w) / 2;
+  imageState.y = (board.clientHeight - imageState.h) / 2;
+
+  updateImage();
+};
+
+// TOZALASH
+
+document.getElementById("clear").onclick = () => {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  imageState = null;
+  imageBox.style.display = "none";
+  placedImage.removeAttribute("src");
+};
+
+// SAQLASH
+
+document.getElementById("download").onclick = () => {
+  const output = document.createElement("canvas");
+
+  output.width = canvas.width;
+  output.height = canvas.height;
+
+  const out = output.getContext("2d");
+
+  out.fillStyle = "white";
+  out.fillRect(0, 0, output.width, output.height);
+
+  out.drawImage(canvas, 0, 0);
+
+  if (imageState && placedImage.complete) {
+    out.drawImage(
+      placedImage,
+      imageState.x * dpr,
+      imageState.y * dpr,
+      imageState.w * dpr,
+      imageState.h * dpr
+    );
+  }
+
+  const link = document.createElement("a");
+  link.download = "Bobur-Website.png";
+  link.href = output.toDataURL("image/png");
+  link.click();
+};
+</script>
+
+</body>
+</html>
